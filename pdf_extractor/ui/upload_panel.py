@@ -7,9 +7,10 @@ from pdf_extractor.state import PDFApp
 
 
 def build(app_state: PDFApp) -> None:
-    def handle_upload(e: events.UploadEventArguments) -> None:
+    async def handle_upload(e: events.UploadEventArguments) -> None:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-            tmp.write(e.content.read())
+            content = await e.file.read()
+            tmp.write(content)
             temp_path = tmp.name
         app_state.load_file(temp_path)
         upload.reset()

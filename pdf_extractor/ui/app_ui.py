@@ -38,8 +38,10 @@ def _build_page() -> None:
         if window is None:
             ui.notify("Native window is not available.", type="negative")
             return
-        result = window.create_file_dialog(
-            webview.SAVE_DIALOG, save_filename="extracted.pdf", file_types=("PDF Files (*.pdf)",)
+        result = await window.create_file_dialog(
+            webview.FileDialog.SAVE,
+            save_filename="extracted.pdf",
+            file_types=("PDF Files (*.pdf)",),
         )
         if not result:
             return
