@@ -4,15 +4,8 @@ PDF logic lives in this module or any of its siblings."""
 import webview
 from nicegui import app, run, ui
 
-from pdf_extractor.state import MODE_CUSTOM_SEQUENCE, MODE_SPLIT_INTERLEAVE, PDFApp
-from pdf_extractor.ui import (
-    custom_sequence_panel,
-    error_panel,
-    mode_selector,
-    progress,
-    split_interleave_panel,
-    upload_panel,
-)
+from pdf_extractor.state import PDFApp
+from pdf_extractor.ui import error_panel, job_panel, progress, upload_panel
 
 
 def register() -> None:
@@ -33,48 +26,64 @@ def register() -> None:
 def _build_page() -> None:
     app_state = PDFApp()
 
-    async def handle_save() -> None:
+    async def handle_export_all() -> None:
         window = app.native.main_window
         if window is None:
             ui.notify("Native window is not available.", type="negative")
             return
-        result = await window.create_file_dialog(
-            webview.FileDialog.SAVE,
-            save_filename="extracted.pdf",
-            file_types=("PDF Files (*.pdf)",),
-        )
+        result = await window.create_file_dialog(webview.FileDialog.FOLDER)
         if not result:
             return
-        dest_path = result if isinstance(result, str) else result[0]
-        await run.io_bound(app_state.extract, dest_path)
-        if app_state.output_path:
-            ui.notify(f"Saved to {app_state.output_path}", type="positive")
+        dest_dir = result if isinstance(result, str) else result[0]
+        await run.io_bound(app_state.extract_all, dest_dir)
+        count = len(app_state.output_paths)
+        if count and not app_state.extraction_errors:
+            ui.notify(f"Exported {count} PDF{'s' if count != 1 else ''} to {dest_dir}", type="positive")
+        elif count:
+            ui.notify(f"Exported {count} PDF(s), but some exports failed.", type="warning")
         else:
-            ui.notify("Failed to save PDF.", type="negative")
+            ui.notify("Failed to export PDFs.", type="negative")
 
     ui.label("PDF Sequence Extractor").classes("text-xl font-bold")
 
     with ui.column().classes("w-full max-w-xl mx-auto gap-4 p-4"):
         upload_panel.build(app_state)
-        mode_selector.build(app_state)
 
-        custom_column = ui.column().classes("w-full")
-        with custom_column:
-            custom_sequence_panel.build(app_state)
+        jobs_container = ui.column().classes("w-full gap-4")
 
-        split_column = ui.column().classes("w-full")
-        with split_column:
-            split_interleave_panel.build(app_state)
+        def handle_add_job() -> None:
+            app_state.add_job()
+            render_jobs.refresh()
 
-        def refresh_mode_visibility() -> None:
-            custom_column.set_visibility(app_state.mode == MODE_CUSTOM_SEQUENCE)
-            split_column.set_visibility(app_state.mode == MODE_SPLIT_INTERLEAVE)
+        def handle_remove_job(index: int) -> None:
+            app_state.remove_job(index)
+            render_jobs.refresh()
 
-        refresh_mode_visibility()
-        ui.timer(0.2, refresh_mode_visibility)
+        @ui.refreshable
+        def render_jobs() -> None:
+            if not app_state.file_path:
+                return
+            for index in range(len(app_state.jobs)):
+                job_panel.build(app_state, index, on_remove=handle_remove_job)
+            ui.button("+ Add another export", on_click=handle_add_job).props("outline").classes("w-full")
+
+        with jobs_container:
+            render_jobs()
+
+        # Loading a file rebuilds app_state.jobs directly (outside any
+        # button handler this page controls), so watch its length rather
+        # than relying on an explicit refresh call from upload_panel.
+        last_job_count = {"n": len(app_state.jobs)}
+
+        def sync_jobs_on_file_load() -> None:
+            if len(app_state.jobs) != last_job_count["n"]:
+                last_job_count["n"] = len(app_state.jobs)
+                render_jobs.refresh()
+
+        ui.timer(0.2, sync_jobs_on_file_load)
 
         error_panel.build(app_state)
         progress.build(app_state)
 
-        save_button = ui.button("Save As...", on_click=handle_save)
-        save_button.bind_enabled_from(app_state, "is_valid")
+        export_button = ui.button("Export All...", on_click=handle_export_all)
+        export_button.bind_enabled_from(app_state, "is_valid")

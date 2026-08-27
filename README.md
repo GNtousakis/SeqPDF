@@ -6,6 +6,7 @@ SeqPDF is a desktop application built with Python and [NiceGUI](https://nicegui.
 
 - **Custom Page Sequences**: Extract specific pages or ranges using intuitive syntax (e.g., `1, 5, 10-15`).
 - **Page Interleaving**: Seamlessly split a PDF at a specific page and interleave the two halves. Ideal for reconstructing documents scanned as two single-sided stacks (e.g., all odd pages, then all even pages).
+- **Multi-Export**: Define two or more page sequences from the same loaded PDF — mixing Custom Sequence and Split & Interleave freely — give each one its own output name, and export them all in one pass to a chosen folder.
 - **Native Desktop Experience**: Runs as a local desktop window using `pywebview`.
 - **Robust Error Handling**: Clear, structured validation messages for invalid inputs, corrupted files, or encrypted PDFs.
 
